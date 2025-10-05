@@ -115,6 +115,96 @@ define(['core/log', 'core/notification'], function(log, notification) {
         }
     }
 
+    /**
+     * Crea el contenedor de vista previa de la cámara
+     */
+    function createCameraPreview() {
+        var container = document.createElement('div');
+        container.id = 'camera-preview-container';
+        container.style.cssText = 
+            'position: fixed;' +
+            'bottom: 20px;' +
+            'right: 20px;' +
+            'width: 240px;' +
+            'background: #fff;' +
+            'border: 3px solid #28a745;' +
+            'border-radius: 8px;' +
+            'box-shadow: 0 4px 12px rgba(0,0,0,0.3);' +
+            'z-index: 9998;' +
+            'overflow: hidden;';
+
+        // Header del preview
+        var header = document.createElement('div');
+        header.style.cssText = 
+            'background: #28a745;' +
+            'color: white;' +
+            'padding: 8px 12px;' +
+            'font-size: 13px;' +
+            'font-weight: bold;' +
+            'display: flex;' +
+            'align-items: center;' +
+            'justify-content: space-between;';
+        
+        var headerText = document.createElement('span');
+        headerText.innerHTML = '<span style="display: inline-block; width: 8px; height: 8px; background: #fff; border-radius: 50%; margin-right: 8px; animation: blink 1.5s infinite;"></span>Supervisión activa';
+        
+        var minimizeBtn = document.createElement('button');
+        minimizeBtn.innerHTML = '−';
+        minimizeBtn.style.cssText = 
+            'background: transparent;' +
+            'border: none;' +
+            'color: white;' +
+            'font-size: 20px;' +
+            'cursor: pointer;' +
+            'padding: 0;' +
+            'width: 24px;' +
+            'height: 24px;' +
+            'line-height: 20px;';
+        
+        header.appendChild(headerText);
+        header.appendChild(minimizeBtn);
+
+        // Video preview
+        var video = document.createElement('video');
+        video.id = 'camera-preview-video';
+        video.setAttribute('autoplay', true);
+        video.setAttribute('playsinline', true);
+        video.setAttribute('muted', true);
+        video.style.cssText = 
+            'width: 100%;' +
+            'display: block;' +
+            'background: #000;';
+
+        container.appendChild(header);
+        container.appendChild(video);
+        document.body.appendChild(container);
+
+        // Animación de parpadeo para el indicador
+        var style = document.createElement('style');
+        style.textContent = '@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }';
+        document.head.appendChild(style);
+
+        // Funcionalidad de minimizar/maximizar
+        var isMinimized = false;
+        minimizeBtn.addEventListener('click', function() {
+            isMinimized = !isMinimized;
+            if (isMinimized) {
+                video.style.display = 'none';
+                container.style.width = '180px';
+                minimizeBtn.innerHTML = '+';
+            } else {
+                video.style.display = 'block';
+                container.style.width = '240px';
+                minimizeBtn.innerHTML = '−';
+            }
+        });
+
+        return {
+            video: video,
+            container: container
+        };
+    }
+
     function startSnapshots(attemptid, saveurl, logurl, sesskey, settings) {
         var intervalMs = 30000; // 30 segundos
 
@@ -131,13 +221,10 @@ define(['core/log', 'core/notification'], function(log, notification) {
             return;
         }
 
-        var video = document.createElement('video');
-        video.setAttribute('autoplay', true);
-        video.setAttribute('playsinline', true);
-        video.style.position = 'fixed';
-        video.style.bottom = '-9999px';
-        video.style.left = '-9999px';
-        document.body.appendChild(video);
+        // Crear el preview visible de la cámara
+        var preview = createCameraPreview();
+        var video = preview.video;
+        var container = preview.container;
 
         var streamRef = null;
         var timerRef = null;
@@ -146,7 +233,7 @@ define(['core/log', 'core/notification'], function(log, notification) {
             try {
                 if (timerRef) { clearInterval(timerRef); }
                 if (streamRef) { streamRef.getTracks().forEach(function(t){ t.stop(); }); }
-                if (video && video.parentNode) { video.parentNode.removeChild(video); }
+                if (container && container.parentNode) { container.parentNode.removeChild(container); }
             } catch (e) { /* ignore */ }
         }
         window.addEventListener('beforeunload', stopAll);
@@ -188,6 +275,11 @@ define(['core/log', 'core/notification'], function(log, notification) {
                           '. Revisa permisos del navegador o usa HTTPS.');
                 log.debug('camerasupervision: cannot start camera ' + reason);
                 
+                // Eliminar el contenedor si falla
+                if (container && container.parentNode) {
+                    container.parentNode.removeChild(container);
+                }
+                
                 // Log del error
                 logEvent(attemptid, 'cameraerror', 
                     'Error al iniciar cámara: ' + reason,
@@ -210,7 +302,7 @@ define(['core/log', 'core/notification'], function(log, notification) {
                 // Configurar detección de eventos
                 setupEventDetection(attemptid, logurl, sesskey, settings);
                 
-                // Iniciar capturas de cámara
+                // Iniciar capturas de cámara con preview visible
                 setTimeout(function() {
                     startSnapshots(attemptid, saveurl, logurl, sesskey, settings);
                 }, 1200);
