@@ -1,0 +1,74 @@
+/* Estilos para el plugin de supervisión por cámara */
+
+.timeline {
+    position: relative;
+    padding: 0;
+    list-style: none;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 15px;
+    padding: 15px;
+    border-left: 3px solid #dee2e6;
+}
+
+.timeline-item.alert-warning {
+    border-left-color: #ffc107;
+}
+
+.timeline-item.alert-danger {
+    border-left-color: #dc3545;
+}
+
+.timeline-item.alert-success {
+    border-left-color: #28a745;
+}
+
+.timeline-item.alert-secondary {
+    border-left-color: #6c757d;
+}
+
+.card-img-top {
+    max-height: 200px;
+    object-fit: cover;
+}
+
+.card-img-top:hover {
+    opacity: 0.8;
+    transition: opacity 0.3s;
+}
+
+/* Badges mejorados */
+.badge {
+    padding: 8px 12px;
+    font-size: 14px;
+}
+
+/* Mejoras para tabs */
+.nav-tabs {
+    border-bottom: 2px solid #dee2e6;
+}
+
+.nav-tabs .nav-link {
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #495057;
+    font-weight: 500;
+}
+
+.nav-tabs .nav-link:hover {
+    border-color: transparent;
+    border-bottom-color: #dee2e6;
+}
+
+.nav-tabs .nav-link.active {
+    border-color: transparent;
+    border-bottom-color: #007bff;
+    color: #007bff;
+}
+
+/* Iconos Font Awesome - si no están disponibles, se ocultan */
+.fa {
+    margin-right: 8px;
+}
