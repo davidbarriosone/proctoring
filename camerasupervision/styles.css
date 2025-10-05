@@ -72,3 +72,45 @@
 .fa {
     margin-right: 8px;
 }
+
+/* =================== ESTILOS PARA LA VISTA PREVIA DE CÁMARA =================== */
+
+#camera-preview-container {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+#camera-preview-video {
+    aspect-ratio: 4/3;
+    object-fit: cover;
+}
+
+/* Asegurar que el preview esté siempre visible */
+#camera-preview-container {
+    pointer-events: auto;
+}
+
+/* Efecto hover en el botón de minimizar */
+#camera-preview-container button:hover {
+    opacity: 0.8;
+}
+
+/* Transición suave al minimizar/maximizar */
+#camera-preview-container,
+#camera-preview-video {
+    transition: all 0.3s ease;
+}
+
+/* Responsive: ajustar tamaño en pantallas pequeñas */
+@media (max-width: 768px) {
+    #camera-preview-container {
+        width: 180px !important;
+        bottom: 10px !important;
+        right: 10px !important;
+    }
+}
+
+/* Asegurar que no interfiera con el quiz */
+#camera-preview-container {
+    user-select: none;
+    -webkit-user-select: none;
+}
