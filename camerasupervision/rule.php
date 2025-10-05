@@ -8,6 +8,15 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
 
     /** @var bool */
     protected $enabled = false;
+    
+    /** @var bool */
+    protected $detectrightclick = false;
+    
+    /** @var bool */
+    protected $detecttabchange = false;
+    
+    /** @var bool */
+    protected $detectappchange = false;
 
     /** Clave de sesión para recordar el preflight aceptado. */
     protected function session_key(): string {
@@ -22,9 +31,12 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         $_SESSION[$this->session_key()] = 1;
     }
 
-    public function __construct(quiz $quizobj, $timenow, $enabled) {
+    public function __construct(quiz $quizobj, $timenow, $settings) {
         parent::__construct($quizobj, $timenow);
-        $this->enabled = (bool)$enabled;
+        $this->enabled = (bool)$settings->enabled;
+        $this->detectrightclick = (bool)($settings->detectrightclick ?? false);
+        $this->detecttabchange = (bool)($settings->detecttabchange ?? false);
+        $this->detectappchange = (bool)($settings->detectappchange ?? false);
     }
 
     /** Crear la regla solo si está habilitada para este quiz. */
@@ -32,7 +44,7 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         global $DB;
         if ($rec = $DB->get_record('quizaccess_camsup', ['quizid' => $quizobj->get_quizid()])) {
             if ((int)$rec->enabled === 1) {
-                return new self($quizobj, $timenow, true);
+                return new self($quizobj, $timenow, $rec);
             }
         }
         return null;
@@ -41,16 +53,40 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     /* =================== AJUSTES EN EL FORMULARIO DEL QUIZ =================== */
 
     public static function add_settings_form_fields(mod_quiz_mod_form $quizform, MoodleQuickForm $mform) {
+        // Header para la sección
+        $mform->addElement('header', 'camerasupervisionheader',
+            get_string('pluginname', 'quizaccess_camerasupervision'));
+
+        // Opción principal: habilitar supervisión por cámara
         $mform->addElement('advcheckbox', 'camerasupervision_enabled',
             get_string('enabled', 'quizaccess_camerasupervision'));
         $mform->addHelpButton('camerasupervision_enabled', 'enabled', 'quizaccess_camerasupervision');
 
-        // Cargar el valor guardado si ya existe.
+        // Opciones de detección
+        $mform->addElement('advcheckbox', 'camerasupervision_detectrightclick',
+            get_string('detectrightclick', 'quizaccess_camerasupervision'));
+        $mform->addHelpButton('camerasupervision_detectrightclick', 'detectrightclick', 'quizaccess_camerasupervision');
+        $mform->disabledIf('camerasupervision_detectrightclick', 'camerasupervision_enabled');
+
+        $mform->addElement('advcheckbox', 'camerasupervision_detecttabchange',
+            get_string('detecttabchange', 'quizaccess_camerasupervision'));
+        $mform->addHelpButton('camerasupervision_detecttabchange', 'detecttabchange', 'quizaccess_camerasupervision');
+        $mform->disabledIf('camerasupervision_detecttabchange', 'camerasupervision_enabled');
+
+        $mform->addElement('advcheckbox', 'camerasupervision_detectappchange',
+            get_string('detectappchange', 'quizaccess_camerasupervision'));
+        $mform->addHelpButton('camerasupervision_detectappchange', 'detectappchange', 'quizaccess_camerasupervision');
+        $mform->disabledIf('camerasupervision_detectappchange', 'camerasupervision_enabled');
+
+        // Cargar valores guardados si ya existe
         global $DB;
         if (!empty($quizform->get_current()->instance)) {
             $quizid = $quizform->get_current()->instance;
             if ($rec = $DB->get_record('quizaccess_camsup', ['quizid' => $quizid])) {
                 $mform->setDefault('camerasupervision_enabled', (int)$rec->enabled);
+                $mform->setDefault('camerasupervision_detectrightclick', (int)($rec->detectrightclick ?? 0));
+                $mform->setDefault('camerasupervision_detecttabchange', (int)($rec->detecttabchange ?? 0));
+                $mform->setDefault('camerasupervision_detectappchange', (int)($rec->detectappchange ?? 0));
             }
         }
     }
@@ -62,17 +98,26 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     public static function save_settings($quiz) {
         global $DB;
         $enabled = empty($quiz->camerasupervision_enabled) ? 0 : 1;
+        $detectrightclick = empty($quiz->camerasupervision_detectrightclick) ? 0 : 1;
+        $detecttabchange = empty($quiz->camerasupervision_detecttabchange) ? 0 : 1;
+        $detectappchange = empty($quiz->camerasupervision_detectappchange) ? 0 : 1;
 
         if ($rec = $DB->get_record('quizaccess_camsup', ['quizid' => $quiz->id])) {
             $rec->enabled = $enabled;
+            $rec->detectrightclick = $detectrightclick;
+            $rec->detecttabchange = $detecttabchange;
+            $rec->detectappchange = $detectappchange;
             $rec->timemodified = time();
             $DB->update_record('quizaccess_camsup', $rec);
         } else {
             $rec = (object)[
-                'quizid'       => $quiz->id,
-                'enabled'      => $enabled,
-                'timecreated'  => time(),
-                'timemodified' => time(),
+                'quizid'            => $quiz->id,
+                'enabled'           => $enabled,
+                'detectrightclick'  => $detectrightclick,
+                'detecttabchange'   => $detecttabchange,
+                'detectappchange'   => $detectappchange,
+                'timecreated'       => time(),
+                'timemodified'      => time(),
             ];
             $DB->insert_record('quizaccess_camsup', $rec);
         }
@@ -90,13 +135,29 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         $mform->addElement('header', 'camsupheader', get_string('supervisiontitle', 'quizaccess_camerasupervision'));
         $mform->addElement('static', 'camsupnotice', '', get_string('legalnotice', 'quizaccess_camerasupervision'));
 
+        // Información sobre qué se va a detectar
+        $detectioninfo = [];
+        $detectioninfo[] = get_string('detection_camera', 'quizaccess_camerasupervision');
+        if ($this->detectrightclick) {
+            $detectioninfo[] = get_string('detection_rightclick', 'quizaccess_camerasupervision');
+        }
+        if ($this->detecttabchange) {
+            $detectioninfo[] = get_string('detection_tabchange', 'quizaccess_camerasupervision');
+        }
+        if ($this->detectappchange) {
+            $detectioninfo[] = get_string('detection_appchange', 'quizaccess_camerasupervision');
+        }
+
+        if (count($detectioninfo) > 0) {
+            $mform->addElement('static', 'detectionlist', 
+                get_string('detectiontitle', 'quizaccess_camerasupervision'),
+                html_writer::alist($detectioninfo));
+        }
+
         $mform->addElement('advcheckbox', 'camerasupervisionconsent',
             get_string('consentlabel', 'quizaccess_camerasupervision'));
         $mform->setType('camerasupervisionconsent', PARAM_BOOL);
         $mform->setDefault('camerasupervisionconsent', 0);
-
-        // Importante: sin reglas del lado del cliente, para no bloquear el submit.
-        // (La validación real la hace validate_preflight_check()).
     }
 
     /** Validación robusta y marca de sesión al aceptar. */
@@ -108,12 +169,10 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
             $accepted = !empty($data['camerasupervisionconsent'] ?? null);
         }
         if (!$accepted) {
-            // Respaldo: lee del POST por si el formulario llegó “plano”.
             $accepted = optional_param('camerasupervisionconsent', 0, PARAM_BOOL) ? 1 : 0;
         }
 
         if ($accepted) {
-            // Evita el “bucle” del preflight en la misma petición.
             $this->set_preflight_passed();
         } else {
             $errors['camerasupervisionconsent'] = get_string('consentrequired', 'quizaccess_camerasupervision');
@@ -146,10 +205,20 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         if (!$attemptid) { return; }
 
         $saveurl = new moodle_url('/mod/quiz/accessrule/camerasupervision/snapshot.php');
+        $logurl = new moodle_url('/mod/quiz/accessrule/camerasupervision/logevent.php');
+        
+        $settings = [
+            'detectRightClick' => $this->detectrightclick,
+            'detectTabChange' => $this->detecttabchange,
+            'detectAppChange' => $this->detectappchange,
+        ];
+        
         $page->requires->js_call_amd('quizaccess_camerasupervision/recorder', 'init', [
             (int)$attemptid,
             $saveurl->out(false),
-            sesskey()
+            $logurl->out(false),
+            sesskey(),
+            $settings
         ]);
     }
 }
