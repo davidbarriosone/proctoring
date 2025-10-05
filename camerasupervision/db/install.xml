@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <XMLDB PATH="mod/quiz/accessrule/camerasupervision/db"
-       VERSION="2025081800"
+       VERSION="2025081805"
        COMMENT="Camerasupervision tables"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <TABLES>
@@ -9,6 +9,9 @@
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="quizid" TYPE="int" LENGTH="10" NOTNULL="true"/>
         <FIELD NAME="enabled" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="detectrightclick" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="detecttabchange" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="detectappchange" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
       </FIELDS>
@@ -16,6 +19,26 @@
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
         <KEY NAME="quizid_ix" TYPE="unique" FIELDS="quizid"/>
       </KEYS>
+    </TABLE>
+    
+    <TABLE NAME="quizaccess_camsup_events" COMMENT="Events log per attempt">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="attemptid" TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="eventtype" TYPE="char" LENGTH="50" NOTNULL="true"/>
+        <FIELD NAME="eventdata" TYPE="text" NOTNULL="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="attemptid_fk" TYPE="foreign" FIELDS="attemptid" REFTABLE="quiz_attempts" REFFIELDS="id"/>
+        <KEY NAME="userid_fk" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="attemptid_idx" UNIQUE="false" FIELDS="attemptid"/>
+        <INDEX NAME="eventtype_idx" UNIQUE="false" FIELDS="eventtype"/>
+      </INDEXES>
     </TABLE>
   </TABLES>
 </XMLDB>
