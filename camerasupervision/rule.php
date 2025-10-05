@@ -18,17 +18,26 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     /** @var bool */
     protected $detectappchange = false;
 
-    /** Clave de sesión para recordar el preflight aceptado. */
-    protected function session_key(): string {
-        return 'quizaccess_camerasupervision_' . $this->quizobj->get_quizid();
+    /** 
+     * Clave de sesión para recordar el preflight aceptado.
+     * MODIFICADO: Ahora incluye el attemptid para que sea único por intento
+     */
+    protected function session_key($attemptid): string {
+        return 'quizaccess_camerasupervision_' . $this->quizobj->get_quizid() . '_attempt_' . $attemptid;
     }
 
-    protected function has_preflight_passed(): bool {
-        return !empty($_SESSION[$this->session_key()]);
+    protected function has_preflight_passed($attemptid): bool {
+        // Si no hay attemptid válido, no puede haber pasado
+        if (!$attemptid) {
+            return false;
+        }
+        return !empty($_SESSION[$this->session_key($attemptid)]);
     }
 
-    protected function set_preflight_passed(): void {
-        $_SESSION[$this->session_key()] = 1;
+    protected function set_preflight_passed($attemptid): void {
+        if ($attemptid) {
+            $_SESSION[$this->session_key($attemptid)] = 1;
+        }
     }
 
     public function __construct(quiz $quizobj, $timenow, $settings) {
@@ -125,10 +134,23 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
 
     /* =================== PREFLIGHT (CONSENTIMIENTO) =================== */
 
-    /** Solo requerir si está activo y aún no está aceptado en sesión. */
+    /** 
+     * MODIFICADO: Siempre requerir si está activo, sin importar la sesión
+     * El consentimiento debe darse PARA CADA INTENTO
+     */
     public function is_preflight_check_required($attemptid) {
-        if (!$this->enabled) { return false; }
-        return !$this->has_preflight_passed();
+        if (!$this->enabled) { 
+            return false; 
+        }
+        
+        // CAMBIO IMPORTANTE: Verificar con el attemptid específico
+        // Si no hay attemptid aún (nuevo intento), siempre requerir
+        if (!$attemptid) {
+            return true;
+        }
+        
+        // Verificar si ya se dio consentimiento para ESTE intento específico
+        return !$this->has_preflight_passed($attemptid);
     }
 
     public function add_preflight_check_form_fields(mod_quiz_preflight_check_form $quizform, MoodleQuickForm $mform, $attemptid) {
@@ -160,23 +182,23 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         $mform->setDefault('camerasupervisionconsent', 0);
     }
 
-    /** Validación robusta y marca de sesión al aceptar. */
+    /** 
+     * MODIFICADO: Validación con attemptid para marcar consentimiento por intento
+     */
     public function validate_preflight_check($data, $files, $errors, $attemptid) {
-        $accepted = 0;
-        if (is_object($data)) {
-            $accepted = !empty($data->camerasupervisionconsent);
-        } else if (is_array($data)) {
-            $accepted = !empty($data['camerasupervisionconsent'] ?? null);
+        $accepted = false;
+        
+        if (isset($data['camerasupervisionconsent'])) {
+            $accepted = (bool)$data['camerasupervisionconsent'];
         }
-        if (!$accepted) {
-            $accepted = optional_param('camerasupervisionconsent', 0, PARAM_BOOL) ? 1 : 0;
-        }
-
+        
         if ($accepted) {
-            $this->set_preflight_passed();
+            // IMPORTANTE: Marcar el consentimiento para ESTE intento específico
+            $this->set_preflight_passed($attemptid);
         } else {
             $errors['camerasupervisionconsent'] = get_string('consentrequired', 'quizaccess_camerasupervision');
         }
+        
         return $errors;
     }
 
