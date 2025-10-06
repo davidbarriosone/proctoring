@@ -19,24 +19,39 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     protected $detectappchange = false;
 
     /** 
-     * Clave de sesión para recordar el preflight aceptado.
-     * Incluye attemptid para que sea único por intento
+     * Clave de sesión temporal para el consentimiento actual.
+     * Usa un timestamp que expira para permitir nuevos intentos.
      */
-    protected function session_key($attemptid): string {
-        return 'quizaccess_camerasupervision_' . $this->quizobj->get_quizid() . '_attempt_' . $attemptid;
+    protected function session_key(): string {
+        global $USER;
+        return 'quizaccess_camerasupervision_' . $this->quizobj->get_quizid() . '_user_' . $USER->id;
     }
 
-    protected function has_preflight_passed($attemptid): bool {
-        if (!$attemptid) {
+    protected function has_preflight_passed(): bool {
+        $key = $this->session_key();
+        if (empty($_SESSION[$key])) {
             return false;
         }
-        return !empty($_SESSION[$this->session_key($attemptid)]);
+        
+        // Verificar si el consentimiento no ha expirado (válido por 5 minutos)
+        $timestamp = $_SESSION[$key];
+        $elapsed = time() - $timestamp;
+        
+        // Si pasaron más de 5 minutos, expiró (nuevo intento)
+        if ($elapsed > 300) {
+            unset($_SESSION[$key]);
+            return false;
+        }
+        
+        return true;
     }
 
-    protected function set_preflight_passed($attemptid): void {
-        if ($attemptid) {
-            $_SESSION[$this->session_key($attemptid)] = 1;
-        }
+    protected function set_preflight_passed(): void {
+        $_SESSION[$this->session_key()] = time();
+    }
+    
+    protected function clear_preflight(): void {
+        unset($_SESSION[$this->session_key()]);
     }
 
     public function __construct(quiz $quizobj, $timenow, $settings) {
@@ -134,20 +149,15 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     /* =================== PREFLIGHT (CONSENTIMIENTO) =================== */
 
     /** 
-     * Requerir consentimiento para cada nuevo intento
+     * Requerir consentimiento solo si no se ha dado recientemente
      */
     public function is_preflight_check_required($attemptid) {
         if (!$this->enabled) { 
             return false; 
         }
         
-        // Si no hay attemptid, es un nuevo intento - requerir consentimiento
-        if (!$attemptid) {
-            return true;
-        }
-        
-        // Verificar si ya se dio consentimiento para ESTE intento específico
-        return !$this->has_preflight_passed($attemptid);
+        // Verificar si ya pasó el preflight recientemente
+        return !$this->has_preflight_passed();
     }
 
     public function add_preflight_check_form_fields(mod_quiz_preflight_check_form $quizform, MoodleQuickForm $mform, $attemptid) {
@@ -180,7 +190,7 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     }
 
     /** 
-     * Validar y marcar el consentimiento para este intento específico
+     * Validar y marcar el consentimiento
      */
     public function validate_preflight_check($data, $files, $errors, $attemptid) {
         $accepted = false;
@@ -190,13 +200,21 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         }
         
         if ($accepted) {
-            // Marcar el consentimiento para ESTE intento específico
-            $this->set_preflight_passed($attemptid);
+            // Marcar el consentimiento con timestamp actual
+            $this->set_preflight_passed();
         } else {
             $errors['camerasupervisionconsent'] = get_string('consentrequired', 'quizaccess_camerasupervision');
         }
         
         return $errors;
+    }
+    
+    /**
+     * Se llama cuando el intento termina - limpiar el consentimiento
+     */
+    public function current_attempt_finished() {
+        // Limpiar el consentimiento para que pida nuevamente en el próximo intento
+        $this->clear_preflight();
     }
 
     /* =================== UI: BOTÓN DE SUPERVISIÓN =================== */
