@@ -20,17 +20,23 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
 
     /** 
      * Clave de sesión para recordar el preflight aceptado.
+     * Incluye attemptid para que sea único por intento
      */
-    protected function session_key(): string {
-        return 'quizaccess_camerasupervision_' . $this->quizobj->get_quizid();
+    protected function session_key($attemptid): string {
+        return 'quizaccess_camerasupervision_' . $this->quizobj->get_quizid() . '_attempt_' . $attemptid;
     }
 
-    protected function has_preflight_passed(): bool {
-        return !empty($_SESSION[$this->session_key()]);
+    protected function has_preflight_passed($attemptid): bool {
+        if (!$attemptid) {
+            return false;
+        }
+        return !empty($_SESSION[$this->session_key($attemptid)]);
     }
 
-    protected function set_preflight_passed(): void {
-        $_SESSION[$this->session_key()] = 1;
+    protected function set_preflight_passed($attemptid): void {
+        if ($attemptid) {
+            $_SESSION[$this->session_key($attemptid)] = 1;
+        }
     }
 
     public function __construct(quiz $quizobj, $timenow, $settings) {
@@ -128,15 +134,20 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     /* =================== PREFLIGHT (CONSENTIMIENTO) =================== */
 
     /** 
-     * Requerir consentimiento solo si no se ha dado aún en esta sesión
+     * Requerir consentimiento para cada nuevo intento
      */
     public function is_preflight_check_required($attemptid) {
         if (!$this->enabled) { 
             return false; 
         }
         
-        // Verificar si ya se dio consentimiento en esta sesión
-        return !$this->has_preflight_passed();
+        // Si no hay attemptid, es un nuevo intento - requerir consentimiento
+        if (!$attemptid) {
+            return true;
+        }
+        
+        // Verificar si ya se dio consentimiento para ESTE intento específico
+        return !$this->has_preflight_passed($attemptid);
     }
 
     public function add_preflight_check_form_fields(mod_quiz_preflight_check_form $quizform, MoodleQuickForm $mform, $attemptid) {
@@ -169,7 +180,7 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     }
 
     /** 
-     * Validar y marcar el consentimiento en la sesión
+     * Validar y marcar el consentimiento para este intento específico
      */
     public function validate_preflight_check($data, $files, $errors, $attemptid) {
         $accepted = false;
@@ -179,8 +190,8 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         }
         
         if ($accepted) {
-            // Marcar el consentimiento en la sesión del usuario
-            $this->set_preflight_passed();
+            // Marcar el consentimiento para ESTE intento específico
+            $this->set_preflight_passed($attemptid);
         } else {
             $errors['camerasupervisionconsent'] = get_string('consentrequired', 'quizaccess_camerasupervision');
         }
@@ -208,9 +219,36 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     /* =================== CARGA DEL JS EN EL INTENTO =================== */
 
     public function setup_attempt_page($page) {
-        if (!$this->enabled) { return; }
+        global $DB;
+        
+        if (!$this->enabled) { 
+            return; 
+        }
+        
         $attemptid = optional_param('attempt', 0, PARAM_INT);
-        if (!$attemptid) { return; }
+        if (!$attemptid) { 
+            return; 
+        }
+
+        // Verificar el estado del intento
+        $attempt = $DB->get_record('quiz_attempts', ['id' => $attemptid], 'state', IGNORE_MISSING);
+        if (!$attempt) {
+            return;
+        }
+
+        // Solo activar la cámara si el intento está EN PROGRESO
+        // Estados posibles: 'inprogress', 'finished', 'abandoned', 'overdue'
+        if ($attempt->state !== 'inprogress') {
+            return; // No cargar JS si el intento ya terminó
+        }
+
+        // Verificar que estamos en la página de attempt, no en review o summary
+        $pagepath = $page->url->get_path();
+        
+        // Solo cargar en attempt.php, NO en review.php ni summary.php
+        if (strpos($pagepath, '/mod/quiz/attempt.php') === false) {
+            return;
+        }
 
         $saveurl = new moodle_url('/mod/quiz/accessrule/camerasupervision/snapshot.php');
         $logurl = new moodle_url('/mod/quiz/accessrule/camerasupervision/logevent.php');
