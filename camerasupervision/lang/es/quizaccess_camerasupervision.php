@@ -75,4 +75,29 @@ $string['noimage'] = 'No se proporcionó ninguna imagen';
 
 // Tipos de eventos
 $string['event_camerastart'] = 'Cámara iniciada';
-$string['event_c
+$string['event_cameraerror'] = 'Error de cámara';
+$string['event_rightclick'] = 'Click derecho detectado';
+$string['event_tabchange'] = 'Abandonó la página';
+$string['event_tabreturn'] = 'Regresó a la página';
+$string['event_appchange'] = 'Cambió de aplicación';
+$string['event_appreturn'] = 'Regresó a la aplicación';
+$string['event_devtools'] = 'Intento de abrir herramientas de desarrollo';
+$string['event_viewsource'] = 'Intento de ver código fuente';
+$string['event_faceverification_success'] = 'Verificación facial exitosa';
+$string['event_faceverification_failed'] = 'Verificación facial fallida';
+
+// Privacidad
+$string['privacy:metadata'] = 'Este plugin almacena imágenes y registros de eventos asociados a intentos de cuestionarios para fines de supervisión.';
+$string['privacy:metadata:quizaccess_camsup_events'] = 'Registro de eventos de supervisión del cuestionario';
+$string['privacy:metadata:quizaccess_camsup_events:attemptid'] = 'El ID del intento del cuestionario';
+$string['privacy:metadata:quizaccess_camsup_events:userid'] = 'El ID del usuario que realiza el cuestionario';
+$string['privacy:metadata:quizaccess_camsup_events:eventtype'] = 'El tipo de evento detectado';
+$string['privacy:metadata:quizaccess_camsup_events:eventdata'] = 'Información adicional sobre el evento';
+$string['privacy:metadata:quizaccess_camsup_events:timecreated'] = 'Cuándo ocurrió el evento';
+$string['privacy:metadata:quizaccess_camsup_faces'] = 'Fotos de referencia para reconocimiento facial';
+$string['privacy:metadata:quizaccess_camsup_faces:userid'] = 'El ID del usuario al que pertenece la foto';
+$string['privacy:metadata:quizaccess_camsup_faces:descriptor'] = 'Descriptor matemático del rostro (no es la imagen original)';
+$string['privacy:metadata:quizaccess_camsup_faces:timecreated'] = 'Cuándo se creó la foto de referencia';
+
+$string['snapshots_filearea'] = 'Capturas de supervisión';
+$string['faceref_filearea'] = 'Fotos de referencia para reconocimiento facial';
