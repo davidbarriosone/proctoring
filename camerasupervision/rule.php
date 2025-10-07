@@ -17,11 +17,13 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     
     /** @var bool */
     protected $detectappchange = false;
+    
+    /** @var bool */
+    protected $facerecognition = false;
+    
+    /** @var float */
+    protected $facethreshold = 0.6;
 
-    /** 
-     * Clave de sesión temporal para el consentimiento actual.
-     * Usa un timestamp que expira para permitir nuevos intentos.
-     */
     protected function session_key(): string {
         global $USER;
         return 'quizaccess_camerasupervision_' . $this->quizobj->get_quizid() . '_user_' . $USER->id;
@@ -33,11 +35,9 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
             return false;
         }
         
-        // Verificar si el consentimiento no ha expirado (válido por 5 minutos)
         $timestamp = $_SESSION[$key];
         $elapsed = time() - $timestamp;
         
-        // Si pasaron más de 5 minutos, expiró (nuevo intento)
         if ($elapsed > 300) {
             unset($_SESSION[$key]);
             return false;
@@ -60,9 +60,10 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         $this->detectrightclick = (bool)($settings->detectrightclick ?? false);
         $this->detecttabchange = (bool)($settings->detecttabchange ?? false);
         $this->detectappchange = (bool)($settings->detectappchange ?? false);
+        $this->facerecognition = (bool)($settings->facerecognition ?? false);
+        $this->facethreshold = (float)($settings->facethreshold ?? 0.6);
     }
 
-    /** Crear la regla solo si está habilitada para este quiz. */
     public static function make(quiz $quizobj, $timenow, $canignoretimelimits) {
         global $DB;
         if ($rec = $DB->get_record('quizaccess_camsup', ['quizid' => $quizobj->get_quizid()])) {
@@ -76,11 +77,9 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     /* =================== AJUSTES EN EL FORMULARIO DEL QUIZ =================== */
 
     public static function add_settings_form_fields(mod_quiz_mod_form $quizform, MoodleQuickForm $mform) {
-        // Header para la sección
         $mform->addElement('header', 'camerasupervisionheader',
             get_string('pluginname', 'quizaccess_camerasupervision'));
 
-        // Opción principal: habilitar supervisión por cámara
         $mform->addElement('advcheckbox', 'camerasupervision_enabled',
             get_string('enabled', 'quizaccess_camerasupervision'));
         $mform->addHelpButton('camerasupervision_enabled', 'enabled', 'quizaccess_camerasupervision');
@@ -101,7 +100,20 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         $mform->addHelpButton('camerasupervision_detectappchange', 'detectappchange', 'quizaccess_camerasupervision');
         $mform->disabledIf('camerasupervision_detectappchange', 'camerasupervision_enabled');
 
-        // Cargar valores guardados si ya existe
+        // Reconocimiento facial
+        $mform->addElement('advcheckbox', 'camerasupervision_facerecognition',
+            get_string('facerecognition', 'quizaccess_camerasupervision'));
+        $mform->addHelpButton('camerasupervision_facerecognition', 'facerecognition', 'quizaccess_camerasupervision');
+        $mform->disabledIf('camerasupervision_facerecognition', 'camerasupervision_enabled');
+
+        $mform->addElement('text', 'camerasupervision_facethreshold',
+            get_string('facethreshold', 'quizaccess_camerasupervision'), ['size' => 10]);
+        $mform->setType('camerasupervision_facethreshold', PARAM_FLOAT);
+        $mform->setDefault('camerasupervision_facethreshold', 0.6);
+        $mform->addHelpButton('camerasupervision_facethreshold', 'facethreshold', 'quizaccess_camerasupervision');
+        $mform->disabledIf('camerasupervision_facethreshold', 'camerasupervision_facerecognition');
+
+        // Cargar valores guardados
         global $DB;
         if (!empty($quizform->get_current()->instance)) {
             $quizid = $quizform->get_current()->instance;
@@ -110,11 +122,20 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
                 $mform->setDefault('camerasupervision_detectrightclick', (int)($rec->detectrightclick ?? 0));
                 $mform->setDefault('camerasupervision_detecttabchange', (int)($rec->detecttabchange ?? 0));
                 $mform->setDefault('camerasupervision_detectappchange', (int)($rec->detectappchange ?? 0));
+                $mform->setDefault('camerasupervision_facerecognition', (int)($rec->facerecognition ?? 0));
+                $mform->setDefault('camerasupervision_facethreshold', (float)($rec->facethreshold ?? 0.6));
             }
         }
     }
 
     public static function validate_settings_form_fields(array $errors, array $data, $files, mod_quiz_mod_form $quizform) {
+        // Validar threshold
+        if (!empty($data['camerasupervision_facerecognition'])) {
+            $threshold = $data['camerasupervision_facethreshold'] ?? 0.6;
+            if ($threshold < 0 || $threshold > 1) {
+                $errors['camerasupervision_facethreshold'] = get_string('error');
+            }
+        }
         return $errors;
     }
 
@@ -124,12 +145,16 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         $detectrightclick = empty($quiz->camerasupervision_detectrightclick) ? 0 : 1;
         $detecttabchange = empty($quiz->camerasupervision_detecttabchange) ? 0 : 1;
         $detectappchange = empty($quiz->camerasupervision_detectappchange) ? 0 : 1;
+        $facerecognition = empty($quiz->camerasupervision_facerecognition) ? 0 : 1;
+        $facethreshold = isset($quiz->camerasupervision_facethreshold) ? (float)$quiz->camerasupervision_facethreshold : 0.6;
 
         if ($rec = $DB->get_record('quizaccess_camsup', ['quizid' => $quiz->id])) {
             $rec->enabled = $enabled;
             $rec->detectrightclick = $detectrightclick;
             $rec->detecttabchange = $detecttabchange;
             $rec->detectappchange = $detectappchange;
+            $rec->facerecognition = $facerecognition;
+            $rec->facethreshold = $facethreshold;
             $rec->timemodified = time();
             $DB->update_record('quizaccess_camsup', $rec);
         } else {
@@ -139,6 +164,8 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
                 'detectrightclick'  => $detectrightclick,
                 'detecttabchange'   => $detecttabchange,
                 'detectappchange'   => $detectappchange,
+                'facerecognition'   => $facerecognition,
+                'facethreshold'     => $facethreshold,
                 'timecreated'       => time(),
                 'timemodified'      => time(),
             ];
@@ -146,25 +173,23 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         }
     }
 
-    /* =================== PREFLIGHT (CONSENTIMIENTO) =================== */
+    /* =================== PREFLIGHT (CONSENTIMIENTO + VERIFICACIÓN FACIAL) =================== */
 
-    /** 
-     * Requerir consentimiento solo si no se ha dado recientemente
-     */
     public function is_preflight_check_required($attemptid) {
         if (!$this->enabled) { 
             return false; 
         }
         
-        // Verificar si ya pasó el preflight recientemente
         return !$this->has_preflight_passed();
     }
 
     public function add_preflight_check_form_fields(mod_quiz_preflight_check_form $quizform, MoodleQuickForm $mform, $attemptid) {
+        global $USER, $PAGE;
+        
         $mform->addElement('header', 'camsupheader', get_string('supervisiontitle', 'quizaccess_camerasupervision'));
         $mform->addElement('static', 'camsupnotice', '', get_string('legalnotice', 'quizaccess_camerasupervision'));
 
-        // Información sobre qué se va a detectar
+        // Información sobre detección
         $detectioninfo = [];
         $detectioninfo[] = get_string('detection_camera', 'quizaccess_camerasupervision');
         if ($this->detectrightclick) {
@@ -176,6 +201,9 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         if ($this->detectappchange) {
             $detectioninfo[] = get_string('detection_appchange', 'quizaccess_camerasupervision');
         }
+        if ($this->facerecognition) {
+            $detectioninfo[] = get_string('detection_facerecognition', 'quizaccess_camerasupervision');
+        }
 
         if (count($detectioninfo) > 0) {
             $mform->addElement('static', 'detectionlist', 
@@ -183,37 +211,127 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
                 html_writer::alist($detectioninfo));
         }
 
+        // Si está habilitado el reconocimiento facial, agregar interfaz
+        if ($this->facerecognition) {
+            // Cargar face-api.js
+            $PAGE->requires->js(new moodle_url('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js'), true);
+            
+            // Cargar módulo AMD
+            $PAGE->requires->js_call_amd('quizaccess_camerasupervision/faceverifier', 'init', [
+                (int)$USER->id,
+                (float)$this->facethreshold
+            ]);
+            
+            $mform->addElement('header', 'faceverificationheader', get_string('faceverificationtitle', 'quizaccess_camerasupervision'));
+            $mform->addElement('static', 'faceverificationhelp', '', get_string('faceverificationhelp', 'quizaccess_camerasupervision'));
+            
+            // Contenedor para la interfaz de verificación facial
+            $html = html_writer::start_div('card mt-3 mb-3');
+            $html .= html_writer::start_div('card-body');
+            
+            // Contenedor de la cámara (oculto inicialmente)
+            $html .= html_writer::start_div('', ['id' => 'verification-camera-container', 'style' => 'display:none; text-align:center;']);
+            $html .= html_writer::tag('video', '', [
+                'id' => 'verification-video',
+                'autoplay' => true,
+                'playsinline' => true,
+                'style' => 'width: 100%; max-width: 640px; border: 2px solid #007bff; border-radius: 8px; margin-bottom: 10px;'
+            ]);
+            $html .= html_writer::end_div();
+            
+            // Canvas oculto para captura
+            $html .= html_writer::tag('canvas', '', [
+                'id' => 'verification-canvas',
+                'style' => 'display:none;'
+            ]);
+            
+            // Imagen capturada
+            $html .= html_writer::empty_tag('img', [
+                'id' => 'captured-image',
+                'style' => 'display:none; max-width: 640px; width: 100%; border: 2px solid #28a745; border-radius: 8px; margin: 10px 0;',
+                'alt' => 'Captured image'
+            ]);
+            
+            // Botones
+            $html .= html_writer::start_div('mt-2');
+            $html .= html_writer::tag('button', get_string('startverificationcamera', 'quizaccess_camerasupervision'), [
+                'id' => 'btn-start-verification',
+                'type' => 'button',
+                'class' => 'btn btn-primary'
+            ]);
+            $html .= ' ';
+            $html .= html_writer::tag('button', get_string('verifyface', 'quizaccess_camerasupervision'), [
+                'id' => 'btn-verify-face',
+                'type' => 'button',
+                'class' => 'btn btn-success',
+                'style' => 'display:none;'
+            ]);
+            $html .= ' ';
+            $html .= html_writer::tag('button', get_string('stopverificationcamera', 'quizaccess_camerasupervision'), [
+                'id' => 'btn-stop-verification',
+                'type' => 'button',
+                'class' => 'btn btn-danger',
+                'style' => 'display:none;'
+            ]);
+            $html .= html_writer::end_div();
+            
+            // Estado de verificación
+            $html .= html_writer::start_div('mt-3', ['id' => 'verification-status']);
+            $html .= html_writer::end_div();
+            
+            $html .= html_writer::end_div();
+            $html .= html_writer::end_div();
+            
+            $mform->addElement('static', 'faceverificationui', '', $html);
+            
+            // Campo oculto para validar si pasó la verificación
+            $mform->addElement('hidden', 'face-verification-passed', '0');
+            $mform->setType('face-verification-passed', PARAM_INT);
+        }
+
+        // Consentimiento
         $mform->addElement('advcheckbox', 'camerasupervisionconsent',
             get_string('consentlabel', 'quizaccess_camerasupervision'));
         $mform->setType('camerasupervisionconsent', PARAM_BOOL);
         $mform->setDefault('camerasupervisionconsent', 0);
     }
 
-    /** 
-     * Validar y marcar el consentimiento
-     */
     public function validate_preflight_check($data, $files, $errors, $attemptid) {
+        global $DB, $USER;
+        
         $accepted = false;
         
         if (isset($data['camerasupervisionconsent'])) {
             $accepted = (bool)$data['camerasupervisionconsent'];
         }
         
-        if ($accepted) {
-            // Marcar el consentimiento con timestamp actual
-            $this->set_preflight_passed();
-        } else {
+        if (!$accepted) {
             $errors['camerasupervisionconsent'] = get_string('consentrequired', 'quizaccess_camerasupervision');
+        }
+        
+        // Si está habilitado el reconocimiento facial, verificar que pasó la verificación
+        if ($this->facerecognition && $accepted) {
+            $verificationPassed = isset($data['face-verification-passed']) ? (int)$data['face-verification-passed'] : 0;
+            
+            if ($verificationPassed !== 1) {
+                $errors['face-verification-passed'] = get_string('verificationrequired', 'quizaccess_camerasupervision');
+            } else {
+                // Verificar que tiene fotos de referencia
+                $hasPhotos = $DB->count_records('quizaccess_camsup_faces', ['userid' => $USER->id]);
+                if ($hasPhotos < 1) {
+                    $errors['face-verification-passed'] = 'No reference photos found for verification';
+                }
+            }
+        }
+        
+        if (empty($errors)) {
+            $this->set_preflight_passed();
         }
         
         return $errors;
     }
     
-    /**
-     * Se llama cuando el intento termina - limpiar el consentimiento
-     */
     public function current_attempt_finished() {
-        // Limpiar el consentimiento para que pida nuevamente en el próximo intento
         $this->clear_preflight();
     }
 
@@ -248,22 +366,17 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
             return; 
         }
 
-        // Verificar el estado del intento
         $attempt = $DB->get_record('quiz_attempts', ['id' => $attemptid], 'state', IGNORE_MISSING);
         if (!$attempt) {
             return;
         }
 
-        // Solo activar la cámara si el intento está EN PROGRESO
-        // Estados posibles: 'inprogress', 'finished', 'abandoned', 'overdue'
         if ($attempt->state !== 'inprogress') {
-            return; // No cargar JS si el intento ya terminó
+            return;
         }
 
-        // Verificar que estamos en la página de attempt, no en review o summary
         $pagepath = $page->url->get_path();
         
-        // Solo cargar en attempt.php, NO en review.php ni summary.php
         if (strpos($pagepath, '/mod/quiz/attempt.php') === false) {
             return;
         }
