@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <XMLDB PATH="mod/quiz/accessrule/camerasupervision/db"
-       VERSION="2025081805"
+       VERSION="2025081806"
        COMMENT="Camerasupervision tables"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <TABLES>
@@ -12,6 +12,8 @@
         <FIELD NAME="detectrightclick" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="detecttabchange" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="detectappchange" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="facerecognition" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
+        <FIELD NAME="facethreshold" TYPE="number" LENGTH="3" DECIMALS="2" NOTNULL="true" DEFAULT="0.6"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
       </FIELDS>
@@ -38,6 +40,26 @@
       <INDEXES>
         <INDEX NAME="attemptid_idx" UNIQUE="false" FIELDS="attemptid"/>
         <INDEX NAME="eventtype_idx" UNIQUE="false" FIELDS="eventtype"/>
+      </INDEXES>
+    </TABLE>
+    
+    <TABLE NAME="quizaccess_camsup_faces" COMMENT="Reference photos for face recognition">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="photoorder" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="1"/>
+        <FIELD NAME="descriptor" TYPE="text" NOTNULL="true"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true"/>
+        <FIELD NAME="createdby" TYPE="int" LENGTH="10" NOTNULL="true"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="userid_fk" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+        <KEY NAME="createdby_fk" TYPE="foreign" FIELDS="createdby" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="userid_idx" UNIQUE="false" FIELDS="userid"/>
+        <INDEX NAME="userid_order_idx" UNIQUE="true" FIELDS="userid,photoorder"/>
       </INDEXES>
     </TABLE>
   </TABLES>
