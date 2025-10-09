@@ -30,16 +30,26 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     }
 
     protected function has_preflight_passed(): bool {
-        $key = $this->session_key();
-        if (empty($_SESSION[$key])) {
+        global $SESSION;
+        
+        // Asegurar que $SESSION existe
+        if (!isset($SESSION)) {
             return false;
         }
         
-        $timestamp = $_SESSION[$key];
+        $key = $this->session_key();
+        
+        // Verificar si existe en la sesión de Moodle
+        if (!isset($SESSION->{$key})) {
+            return false;
+        }
+        
+        $timestamp = $SESSION->{$key};
         $elapsed = time() - $timestamp;
         
-        if ($elapsed > 300) {
-            unset($_SESSION[$key]);
+        // Aumentar el tiempo de validez a 1 hora (3600 segundos)
+        if ($elapsed > 3600) {
+            unset($SESSION->{$key});
             return false;
         }
         
@@ -47,11 +57,28 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     }
 
     protected function set_preflight_passed(): void {
-        $_SESSION[$this->session_key()] = time();
+        global $SESSION;
+        
+        // Asegurar que $SESSION existe
+        if (!isset($SESSION)) {
+            $SESSION = new stdClass();
+        }
+        
+        $key = $this->session_key();
+        $SESSION->{$key} = time();
+        
+        // IMPORTANTE: Forzar que Moodle guarde la sesión
+        \core\session\manager::write_close();
+        \core\session\manager::start();
     }
     
     protected function clear_preflight(): void {
-        unset($_SESSION[$this->session_key()]);
+        global $SESSION;
+        
+        if (isset($SESSION)) {
+            $key = $this->session_key();
+            unset($SESSION->{$key});
+        }
     }
 
     public function __construct(quiz $quizobj, $timenow, $settings) {
@@ -180,7 +207,11 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
             return false; 
         }
         
-        return !$this->has_preflight_passed();
+        // CAMBIO CRÍTICO: Solo pedir preflight una vez por intento
+        // Si ya pasó el preflight, no pedirlo de nuevo
+        $passed = $this->has_preflight_passed();
+        
+        return !$passed;
     }
 
     public function add_preflight_check_form_fields(mod_quiz_preflight_check_form $quizform, MoodleQuickForm $mform, $attemptid) {
@@ -285,8 +316,8 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
             $mform->addElement('static', 'faceverificationui', '', $html);
             
             // Campo oculto para validar si pasó la verificación
-            $mform->addElement('hidden', 'face-verification-passed', '0');
-            $mform->setType('face-verification-passed', PARAM_INT);
+            $mform->addElement('hidden', 'face_verification_passed', '0');
+            $mform->setType('face_verification_passed', PARAM_INT);
         }
 
         // Consentimiento
@@ -311,19 +342,20 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         
         // Si está habilitado el reconocimiento facial, verificar que pasó la verificación
         if ($this->facerecognition && $accepted) {
-            $verificationPassed = isset($data['face-verification-passed']) ? (int)$data['face-verification-passed'] : 0;
+            $verificationPassed = isset($data['face_verification_passed']) ? (int)$data['face_verification_passed'] : 0;
             
             if ($verificationPassed !== 1) {
-                $errors['face-verification-passed'] = get_string('verificationrequired', 'quizaccess_camerasupervision');
+                $errors['face_verification_passed'] = get_string('verificationrequired', 'quizaccess_camerasupervision');
             } else {
                 // Verificar que tiene fotos de referencia
                 $hasPhotos = $DB->count_records('quizaccess_camsup_faces', ['userid' => $USER->id]);
                 if ($hasPhotos < 1) {
-                    $errors['face-verification-passed'] = 'No reference photos found for verification';
+                    $errors['face_verification_passed'] = 'No reference photos found for verification';
                 }
             }
         }
         
+        // CRÍTICO: Solo marcar como pasado si NO hay errores
         if (empty($errors)) {
             $this->set_preflight_passed();
         }
