@@ -24,10 +24,8 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
             await faceapi.nets.faceLandmark68Net.loadFromUri(modelPath);
             await faceapi.nets.faceRecognitionNet.loadFromUri(modelPath);
             
-            log.debug('camerasupervision: face-api models loaded for verification');
             return true;
         } catch (err) {
-            log.error('camerasupervision: error loading models: ' + err);
             return false;
         }
     }
