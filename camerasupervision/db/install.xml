@@ -2,7 +2,8 @@
 <XMLDB PATH="mod/quiz/accessrule/camerasupervision/db"
        VERSION="2025081806"
        COMMENT="Camerasupervision tables"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:noNamespaceSchemaLocation="../../../../../lib/xmldb/xmldb.xsd">
   <TABLES>
     <TABLE NAME="quizaccess_camsup" COMMENT="Settings per quiz">
       <FIELDS>
@@ -13,7 +14,7 @@
         <FIELD NAME="detecttabchange" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="detectappchange" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="facerecognition" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0"/>
-        <FIELD NAME="facethreshold" TYPE="number" LENGTH="3" DECIMALS="2" NOTNULL="true" DEFAULT="0.6"/>
+        <FIELD NAME="facethreshold" TYPE="number" LENGTH="3" NOTNULL="true" DECIMALS="2" DEFAULT="0.6"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0"/>
       </FIELDS>
