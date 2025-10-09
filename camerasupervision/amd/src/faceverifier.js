@@ -18,7 +18,7 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
         faceapi = window.faceapi;
         
         try {
-            var modelPath = M.cfg.wwwroot + '/mod/quiz/accessrule/camerasupervision/models';
+            var modelPath = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
             
             await faceapi.nets.tinyFaceDetector.loadFromUri(modelPath);
             await faceapi.nets.faceLandmark68Net.loadFromUri(modelPath);
