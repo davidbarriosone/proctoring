@@ -117,8 +117,12 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
                     '</div>'
                 );
                 
-                // Habilitar el botón de continuar
-                $('#face-verification-passed').val('1');
+                // CRÍTICO: Actualizar el campo oculto
+                $('#face_verification_passed').val('1');
+                $('input[name="face_verification_passed"]').val('1');
+                
+                log.debug('camerasupervision: Updated face_verification_passed field to 1');
+                
                 verificationPassed = true;
                 
                 // Guardar evento de verificación exitosa
@@ -134,7 +138,8 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
                     '</div>'
                 );
                 
-                $('#face-verification-passed').val('0');
+                $('#face_verification_passed').val('0');
+                $('input[name="face_verification_passed"]').val('0');
                 verificationPassed = false;
                 
                 // Guardar evento de verificación fallida
@@ -251,8 +256,12 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
      * Bloquear envío del formulario si no pasó verificación
      */
     function blockFormSubmission() {
-        $('form[action*="attempt.php"]').on('submit', function(e) {
-            if (!verificationPassed) {
+        $('form[action*="startattempt.php"]').on('submit', function(e) {
+            // Verificar el valor del campo justo antes de enviar
+            var fieldValue = $('input[name="face_verification_passed"]').val();
+            log.debug('camerasupervision: form submit - face_verification_passed = ' + fieldValue);
+            
+            if (fieldValue !== '1' && !verificationPassed) {
                 e.preventDefault();
                 notification.alert(
                     'Verificación requerida',
