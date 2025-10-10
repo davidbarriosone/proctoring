@@ -32,22 +32,15 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     protected function has_preflight_passed(): bool {
         global $SESSION, $USER, $DB;
         
-        // DEBUG: Registrar en logs
-        debugging('CAMSUP DEBUG: Checking if preflight passed', DEBUG_DEVELOPER);
-        
         // Asegurar que $SESSION existe
         if (!isset($SESSION)) {
-            debugging('CAMSUP DEBUG: SESSION not set', DEBUG_DEVELOPER);
             return false;
         }
         
         $key = $this->session_key();
-        debugging('CAMSUP DEBUG: Session key = ' . $key, DEBUG_DEVELOPER);
         
         // Verificar si existe en la sesión de Moodle
         if (!isset($SESSION->{$key})) {
-            debugging('CAMSUP DEBUG: Session key not found in SESSION', DEBUG_DEVELOPER);
-            
             // ALTERNATIVA: Verificar en la base de datos si ya aceptó el consentimiento
             $attemptid = optional_param('attempt', 0, PARAM_INT);
             if ($attemptid > 0) {
@@ -59,7 +52,6 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
                 ]);
                 
                 if ($consent) {
-                    debugging('CAMSUP DEBUG: Found consent in DB for attempt ' . $attemptid, DEBUG_DEVELOPER);
                     // Restaurar la sesión
                     $SESSION->{$key} = $consent->timecreated;
                     return true;
@@ -72,23 +64,17 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         $timestamp = $SESSION->{$key};
         $elapsed = time() - $timestamp;
         
-        debugging('CAMSUP DEBUG: Session timestamp = ' . $timestamp . ', elapsed = ' . $elapsed, DEBUG_DEVELOPER);
-        
         // Aumentar el tiempo de validez a 24 horas
         if ($elapsed > 86400) {
-            debugging('CAMSUP DEBUG: Session expired', DEBUG_DEVELOPER);
             unset($SESSION->{$key});
             return false;
         }
         
-        debugging('CAMSUP DEBUG: Preflight passed!', DEBUG_DEVELOPER);
         return true;
     }
 
     protected function set_preflight_passed(): void {
         global $SESSION, $USER, $DB;
-        
-        debugging('CAMSUP DEBUG: Setting preflight passed', DEBUG_DEVELOPER);
         
         // Asegurar que $SESSION existe
         if (!isset($SESSION)) {
@@ -97,8 +83,6 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         
         $key = $this->session_key();
         $SESSION->{$key} = time();
-        
-        debugging('CAMSUP DEBUG: Session key set: ' . $key . ' = ' . time(), DEBUG_DEVELOPER);
         
         // GUARDAR EN BD como respaldo
         $attemptid = optional_param('attempt', 0, PARAM_INT);
@@ -118,16 +102,12 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
                 $record->eventdata = 'User accepted camera supervision consent';
                 $record->timecreated = time();
                 $DB->insert_record('quizaccess_camsup_events', $record);
-                
-                debugging('CAMSUP DEBUG: Consent saved to DB for attempt ' . $attemptid, DEBUG_DEVELOPER);
             }
         }
     }
     
     protected function clear_preflight(): void {
         global $SESSION;
-        
-        debugging('CAMSUP DEBUG: Clearing preflight', DEBUG_DEVELOPER);
         
         if (isset($SESSION)) {
             $key = $this->session_key();
@@ -257,24 +237,17 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     /* =================== PREFLIGHT (CONSENTIMIENTO + VERIFICACIÓN FACIAL) =================== */
 
     public function is_preflight_check_required($attemptid) {
-        debugging('CAMSUP DEBUG: is_preflight_check_required called with attemptid=' . $attemptid, DEBUG_DEVELOPER);
-        
         if (!$this->enabled) {
-            debugging('CAMSUP DEBUG: Plugin not enabled', DEBUG_DEVELOPER);
             return false; 
         }
         
         $passed = $this->has_preflight_passed();
-        
-        debugging('CAMSUP DEBUG: Preflight required = ' . ($passed ? 'false' : 'true'), DEBUG_DEVELOPER);
         
         return !$passed;
     }
 
     public function add_preflight_check_form_fields(mod_quiz_preflight_check_form $quizform, MoodleQuickForm $mform, $attemptid) {
         global $USER, $PAGE;
-        
-        debugging('CAMSUP DEBUG: Adding preflight form fields', DEBUG_DEVELOPER);
         
         $mform->addElement('header', 'camsupheader', get_string('supervisiontitle', 'quizaccess_camerasupervision'));
         $mform->addElement('static', 'camsupnotice', '', get_string('legalnotice', 'quizaccess_camerasupervision'));
@@ -389,16 +362,11 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
     public function validate_preflight_check($data, $files, $errors, $attemptid) {
         global $DB, $USER;
         
-        debugging('CAMSUP DEBUG: validate_preflight_check called', DEBUG_DEVELOPER);
-        debugging('CAMSUP DEBUG: data = ' . print_r($data, true), DEBUG_DEVELOPER);
-        
         $accepted = false;
         
         if (isset($data['camerasupervisionconsent'])) {
             $accepted = (bool)$data['camerasupervisionconsent'];
         }
-        
-        debugging('CAMSUP DEBUG: Consent accepted = ' . ($accepted ? 'yes' : 'no'), DEBUG_DEVELOPER);
         
         if (!$accepted) {
             $errors['camerasupervisionconsent'] = get_string('consentrequired', 'quizaccess_camerasupervision');
@@ -406,18 +374,13 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
         
         // Si está habilitado el reconocimiento facial, verificar que pasó la verificación
         if ($this->facerecognition && $accepted) {
-            debugging('CAMSUP DEBUG: Checking face verification', DEBUG_DEVELOPER);
-            
             $verificationPassed = isset($data['face_verification_passed']) ? (int)$data['face_verification_passed'] : 0;
-            
-            debugging('CAMSUP DEBUG: face_verification_passed = ' . $verificationPassed, DEBUG_DEVELOPER);
             
             if ($verificationPassed !== 1) {
                 $errors['face_verification_passed'] = get_string('verificationrequired', 'quizaccess_camerasupervision');
             } else {
                 // Verificar que tiene fotos de referencia
                 $hasPhotos = $DB->count_records('quizaccess_camsup_faces', ['userid' => $USER->id]);
-                debugging('CAMSUP DEBUG: User has ' . $hasPhotos . ' reference photos', DEBUG_DEVELOPER);
                 
                 if ($hasPhotos < 1) {
                     $errors['face_verification_passed'] = 'No reference photos found for verification';
@@ -425,21 +388,15 @@ class quizaccess_camerasupervision extends quiz_access_rule_base {
             }
         }
         
-        debugging('CAMSUP DEBUG: Validation errors = ' . print_r($errors, true), DEBUG_DEVELOPER);
-        
-        // CRÍTICO: Solo marcar como pasado si NO hay errores
+        // Solo marcar como pasado si NO hay errores
         if (empty($errors)) {
-            debugging('CAMSUP DEBUG: No errors, setting preflight passed', DEBUG_DEVELOPER);
             $this->set_preflight_passed();
-        } else {
-            debugging('CAMSUP DEBUG: Errors found, NOT setting preflight passed', DEBUG_DEVELOPER);
         }
         
         return $errors;
     }
     
     public function current_attempt_finished() {
-        debugging('CAMSUP DEBUG: current_attempt_finished called', DEBUG_DEVELOPER);
         $this->clear_preflight();
     }
 
