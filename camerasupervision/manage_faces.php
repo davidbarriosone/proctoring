@@ -5,6 +5,7 @@ require_once($CFG->libdir . '/adminlib.php');
 admin_externalpage_setup('quizaccess_camerasupervision_faces');
 
 $userid = optional_param('userid', 0, PARAM_INT);
+$username = optional_param('username', '', PARAM_USERNAME);
 $action = optional_param('action', '', PARAM_ALPHA);
 $deleteid = optional_param('deleteid', 0, PARAM_INT);
 
@@ -27,6 +28,14 @@ if ($action === 'delete' && $deleteid && confirm_sesskey()) {
         \core\output\notification::NOTIFY_SUCCESS);
 }
 
+// Buscar usuario por username si se proporcionó
+if (!empty($username) && $userid == 0) {
+    $user = $DB->get_record('user', ['username' => $username], 'id', IGNORE_MISSING);
+    if ($user) {
+        $userid = $user->id;
+    }
+}
+
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('managefacephotos', 'quizaccess_camerasupervision'));
 
@@ -35,21 +44,44 @@ echo html_writer::start_div('card mb-4');
 echo html_writer::start_div('card-body');
 echo html_writer::tag('h5', get_string('selectstudent', 'quizaccess_camerasupervision'), ['class' => 'card-title']);
 
-echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out(false)]);
-echo html_writer::start_div('form-group');
-echo html_writer::label(get_string('studentid', 'quizaccess_camerasupervision'), 'userid');
+echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out(false), 'class' => 'form-inline']);
+
+// Campo para ID
+echo html_writer::start_div('form-group mr-3 mb-2');
+echo html_writer::label(get_string('studentid', 'quizaccess_camerasupervision'), 'userid', false, ['class' => 'mr-2']);
 echo html_writer::empty_tag('input', [
     'type' => 'number',
     'name' => 'userid',
     'id' => 'userid',
     'class' => 'form-control',
-    'value' => $userid,
-    'placeholder' => 'ID del usuario',
-    'required' => true
+    'value' => $userid > 0 ? $userid : '',
+    'placeholder' => 'ID',
+    'style' => 'width: 100px;'
 ]);
 echo html_writer::end_div();
-echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => get_string('search'), 'class' => 'btn btn-primary']);
+
+// Campo para Username
+echo html_writer::start_div('form-group mr-3 mb-2');
+echo html_writer::label('Username', 'username', false, ['class' => 'mr-2']);
+echo html_writer::empty_tag('input', [
+    'type' => 'text',
+    'name' => 'username',
+    'id' => 'username',
+    'class' => 'form-control',
+    'value' => $username,
+    'placeholder' => 'Username',
+    'style' => 'width: 200px;'
+]);
+echo html_writer::end_div();
+
+echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => get_string('search'), 'class' => 'btn btn-primary mb-2']);
 echo html_writer::end_tag('form');
+
+// Ayuda
+echo html_writer::div(
+    html_writer::tag('small', 'Puedes buscar por ID de usuario o por nombre de usuario (username)', ['class' => 'text-muted']),
+    'mt-2'
+);
 
 echo html_writer::end_div();
 echo html_writer::end_div();
@@ -66,6 +98,7 @@ if ($userid > 0) {
         echo html_writer::start_div('card-body');
         echo html_writer::tag('h5', get_string('studentinfo', 'quizaccess_camerasupervision'), ['class' => 'card-title']);
         echo html_writer::tag('p', '<strong>' . get_string('fullname') . ':</strong> ' . fullname($user), ['class' => 'card-text']);
+        echo html_writer::tag('p', '<strong>Username:</strong> ' . $user->username, ['class' => 'card-text']);
         echo html_writer::tag('p', '<strong>' . get_string('email') . ':</strong> ' . $user->email, ['class' => 'card-text']);
         echo html_writer::end_div();
         echo html_writer::end_div();
@@ -139,7 +172,8 @@ if ($userid > 0) {
             echo html_writer::start_tag('form', [
                 'method' => 'post',
                 'enctype' => 'multipart/form-data',
-                'action' => new moodle_url('/mod/quiz/accessrule/camerasupervision/upload_face.php')
+                'action' => new moodle_url('/mod/quiz/accessrule/camerasupervision/upload_face.php'),
+                'id' => 'upload-form'
             ]);
             echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'sesskey', 'value' => sesskey()]);
             echo html_writer::empty_tag('input', ['type' => 'hidden', 'name' => 'userid', 'value' => $userid]);
