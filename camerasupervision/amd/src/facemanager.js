@@ -149,24 +149,31 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
             var response = await fetch(M.cfg.wwwroot + '/mod/quiz/accessrule/camerasupervision/upload_face.php', {
                 method: 'POST',
                 credentials: 'same-origin',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
                 body: formData
             });
             
             var result = await response.json();
             
             if (result.status === 'ok') {
-                $('#capture-status').html('<div class="alert alert-success">' + result.message + '</div>');
+                $('#capture-status').html(
+                    '<div class="alert alert-success">' +
+                    '<i class="fa fa-check-circle"></i> ' + result.message +
+                    '</div>'
+                );
                 
                 // Recargar página después de 2 segundos
                 setTimeout(function() {
                     window.location.reload();
                 }, 2000);
             } else {
-                $('#capture-status').html('<div class="alert alert-danger">' + result.message + '</div>');
+                $('#capture-status').html('<div class="alert alert-danger"><i class="fa fa-times-circle"></i> ' + result.message + '</div>');
             }
         } catch (err) {
             log.error('camerasupervision: error uploading photo: ' + err);
-            $('#capture-status').html('<div class="alert alert-danger">Error al guardar la foto</div>');
+            $('#capture-status').html('<div class="alert alert-danger"><i class="fa fa-times-circle"></i> Error al guardar la foto</div>');
         }
     }
     
@@ -207,6 +214,38 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
     }
     
     /**
+     * Mostrar estado de procesamiento en el formulario
+     */
+    function showUploadStatus(message, type) {
+        var alertClass = 'alert-info';
+        var icon = 'fa-info-circle';
+        
+        if (type === 'success') {
+            alertClass = 'alert-success';
+            icon = 'fa-check-circle';
+        } else if (type === 'error') {
+            alertClass = 'alert-danger';
+            icon = 'fa-times-circle';
+        } else if (type === 'warning') {
+            alertClass = 'alert-warning';
+            icon = 'fa-exclamation-triangle';
+        }
+        
+        // Buscar o crear contenedor de estado
+        var statusDiv = $('#upload-status');
+        if (statusDiv.length === 0) {
+            statusDiv = $('<div id="upload-status" class="mt-3"></div>');
+            $('#upload-form').after(statusDiv);
+        }
+        
+        statusDiv.html(
+            '<div class="alert ' + alertClass + '">' +
+            '<i class="fa ' + icon + '"></i> ' + message +
+            '</div>'
+        );
+    }
+    
+    /**
      * Inicializar
      */
     return {
@@ -233,7 +272,7 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
             });
             
             // Interceptar envío de formulario de archivo
-            $('form').on('submit', async function(e) {
+            $('#upload-form').on('submit', async function(e) {
                 var fileInput = $('#photofile')[0];
                 
                 if (!fileInput || !fileInput.files || !fileInput.files[0]) {
@@ -242,13 +281,23 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
                 
                 e.preventDefault();
                 
-                $('#capture-status').html('<div class="alert alert-info">Procesando imagen...</div>');
+                // Deshabilitar botón de envío
+                var submitBtn = $(this).find('input[type="submit"]');
+                submitBtn.prop('disabled', true).val('Procesando...');
+                
+                showUploadStatus('Procesando imagen...', 'info');
                 
                 try {
                     var descriptor = await processUploadedFile(fileInput.files[0]);
                     
+                    showUploadStatus('Rostro detectado correctamente. Subiendo foto...', 'success');
+                    
                     // Agregar descriptor al formulario
                     var form = $(this);
+                    
+                    // Eliminar descriptor anterior si existe
+                    form.find('input[name="descriptor"]').remove();
+                    
                     $('<input>').attr({
                         type: 'hidden',
                         name: 'descriptor',
@@ -259,7 +308,10 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
                     form.off('submit').submit();
                     
                 } catch (err) {
-                    $('#capture-status').html('<div class="alert alert-danger">' + err.message + '</div>');
+                    showUploadStatus(err.message, 'error');
+                    
+                    // Rehabilitar botón
+                    submitBtn.prop('disabled', false).val('Subir');
                 }
                 
                 return false;
