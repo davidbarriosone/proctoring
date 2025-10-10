@@ -139,42 +139,18 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
         
         $('#capture-status').html('<div class="alert alert-info">Guardando foto...</div>');
         
-        var formData = new FormData();
-        formData.append('userid', userid);
-        formData.append('image', imageData);
-        formData.append('descriptor', JSON.stringify(descriptor));
-        formData.append('sesskey', sesskey);
+        // Crear un formulario oculto y enviarlo (para que el servidor redirija)
+        var form = $('<form>', {
+            'method': 'post',
+            'action': M.cfg.wwwroot + '/mod/quiz/accessrule/camerasupervision/upload_face.php'
+        });
         
-        try {
-            var response = await fetch(M.cfg.wwwroot + '/mod/quiz/accessrule/camerasupervision/upload_face.php', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: formData
-            });
-            
-            var result = await response.json();
-            
-            if (result.status === 'ok') {
-                $('#capture-status').html(
-                    '<div class="alert alert-success">' +
-                    '<i class="fa fa-check-circle"></i> ' + result.message +
-                    '</div>'
-                );
-                
-                // Recargar página después de 2 segundos
-                setTimeout(function() {
-                    window.location.reload();
-                }, 2000);
-            } else {
-                $('#capture-status').html('<div class="alert alert-danger"><i class="fa fa-times-circle"></i> ' + result.message + '</div>');
-            }
-        } catch (err) {
-            log.error('camerasupervision: error uploading photo: ' + err);
-            $('#capture-status').html('<div class="alert alert-danger"><i class="fa fa-times-circle"></i> Error al guardar la foto</div>');
-        }
+        form.append($('<input>', {'type': 'hidden', 'name': 'sesskey', 'value': sesskey}));
+        form.append($('<input>', {'type': 'hidden', 'name': 'userid', 'value': userid}));
+        form.append($('<input>', {'type': 'hidden', 'name': 'image', 'value': imageData}));
+        form.append($('<input>', {'type': 'hidden', 'name': 'descriptor', 'value': JSON.stringify(descriptor)}));
+        
+        form.appendTo('body').submit();
     }
     
     /**
@@ -214,38 +190,6 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
     }
     
     /**
-     * Mostrar estado de procesamiento en el formulario
-     */
-    function showUploadStatus(message, type) {
-        var alertClass = 'alert-info';
-        var icon = 'fa-info-circle';
-        
-        if (type === 'success') {
-            alertClass = 'alert-success';
-            icon = 'fa-check-circle';
-        } else if (type === 'error') {
-            alertClass = 'alert-danger';
-            icon = 'fa-times-circle';
-        } else if (type === 'warning') {
-            alertClass = 'alert-warning';
-            icon = 'fa-exclamation-triangle';
-        }
-        
-        // Buscar o crear contenedor de estado
-        var statusDiv = $('#upload-status');
-        if (statusDiv.length === 0) {
-            statusDiv = $('<div id="upload-status" class="mt-3"></div>');
-            $('#upload-form').after(statusDiv);
-        }
-        
-        statusDiv.html(
-            '<div class="alert ' + alertClass + '">' +
-            '<i class="fa ' + icon + '"></i> ' + message +
-            '</div>'
-        );
-    }
-    
-    /**
      * Inicializar
      */
     return {
@@ -272,7 +216,7 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
             });
             
             // Interceptar envío de formulario de archivo
-            $('#upload-form').on('submit', async function(e) {
+            $('form').on('submit', async function(e) {
                 var fileInput = $('#photofile')[0];
                 
                 if (!fileInput || !fileInput.files || !fileInput.files[0]) {
@@ -281,37 +225,24 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
                 
                 e.preventDefault();
                 
-                // Deshabilitar botón de envío
-                var submitBtn = $(this).find('input[type="submit"]');
-                submitBtn.prop('disabled', true).val('Procesando...');
-                
-                showUploadStatus('Procesando imagen...', 'info');
+                $('#capture-status').html('<div class="alert alert-info">Procesando imagen...</div>');
                 
                 try {
                     var descriptor = await processUploadedFile(fileInput.files[0]);
                     
-                    showUploadStatus('Rostro detectado correctamente. Subiendo foto...', 'success');
-                    
                     // Agregar descriptor al formulario
                     var form = $(this);
-                    
-                    // Eliminar descriptor anterior si existe
-                    form.find('input[name="descriptor"]').remove();
-                    
                     $('<input>').attr({
                         type: 'hidden',
                         name: 'descriptor',
                         value: JSON.stringify(descriptor)
                     }).appendTo(form);
                     
-                    // Enviar formulario
+                    // Enviar formulario (el servidor redirigirá)
                     form.off('submit').submit();
                     
                 } catch (err) {
-                    showUploadStatus(err.message, 'error');
-                    
-                    // Rehabilitar botón
-                    submitBtn.prop('disabled', false).val('Subir');
+                    $('#capture-status').html('<div class="alert alert-danger">' + err.message + '</div>');
                 }
                 
                 return false;
