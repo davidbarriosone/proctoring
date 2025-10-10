@@ -66,12 +66,12 @@ $string['stopcamera'] = 'Detener cámara';
 $string['takephoto'] = 'Tomar foto';
 $string['photo'] = 'Foto';
 $string['maxphotos'] = 'Este estudiante ya tiene el máximo de 3 fotos de referencia.';
-$string['photouploadsuccess'] = 'Foto subida correctamente';
-$string['photodeletesuccess'] = 'Foto eliminada correctamente';
+$string['photouploadsuccess'] = '✓ Foto de referencia guardada correctamente';
+$string['photodeletesuccess'] = '✓ Foto eliminada correctamente';
 $string['confirmdelete'] = '¿Estás seguro de que deseas eliminar esta foto?';
 $string['usernotfound'] = 'Usuario no encontrado';
-$string['invalidimage'] = 'Imagen inválida o no se detectó rostro';
-$string['noimage'] = 'No se proporcionó ninguna imagen';
+$string['invalidimage'] = '✗ Imagen inválida o no se detectó rostro en la foto';
+$string['noimage'] = '✗ No se proporcionó ninguna imagen';
 
 // Tipos de eventos
 $string['event_camerastart'] = 'Cámara iniciada';
