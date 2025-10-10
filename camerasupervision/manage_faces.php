@@ -44,44 +44,26 @@ echo html_writer::start_div('card mb-4');
 echo html_writer::start_div('card-body');
 echo html_writer::tag('h5', get_string('selectstudent', 'quizaccess_camerasupervision'), ['class' => 'card-title']);
 
-echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out(false), 'class' => 'form-inline']);
+echo html_writer::start_tag('form', ['method' => 'get', 'action' => $PAGE->url->out(false)]);
 
-// Campo para ID
-echo html_writer::start_div('form-group mr-3 mb-2');
-echo html_writer::label(get_string('studentid', 'quizaccess_camerasupervision'), 'userid', false, ['class' => 'mr-2']);
-echo html_writer::empty_tag('input', [
-    'type' => 'number',
-    'name' => 'userid',
-    'id' => 'userid',
-    'class' => 'form-control',
-    'value' => $userid > 0 ? $userid : '',
-    'placeholder' => 'ID',
-    'style' => 'width: 100px;'
-]);
-echo html_writer::end_div();
-
-// Campo para Username
-echo html_writer::start_div('form-group mr-3 mb-2');
-echo html_writer::label('Username', 'username', false, ['class' => 'mr-2']);
+echo html_writer::start_div('form-group');
+echo html_writer::label('Username del estudiante', 'username', false, ['class' => 'font-weight-bold']);
 echo html_writer::empty_tag('input', [
     'type' => 'text',
     'name' => 'username',
     'id' => 'username',
     'class' => 'form-control',
     'value' => $username,
-    'placeholder' => 'Username',
-    'style' => 'width: 200px;'
+    'placeholder' => 'Ingrese el username del estudiante',
+    'required' => true,
+    'autofocus' => true
 ]);
+echo html_writer::tag('small', 'Ingrese el nombre de usuario (username) del estudiante para buscar sus fotos de referencia.', 
+    ['class' => 'form-text text-muted']);
 echo html_writer::end_div();
 
-echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => get_string('search'), 'class' => 'btn btn-primary mb-2']);
+echo html_writer::empty_tag('input', ['type' => 'submit', 'value' => get_string('search'), 'class' => 'btn btn-primary']);
 echo html_writer::end_tag('form');
-
-// Ayuda
-echo html_writer::div(
-    html_writer::tag('small', 'Puedes buscar por ID de usuario o por nombre de usuario (username)', ['class' => 'text-muted']),
-    'mt-2'
-);
 
 echo html_writer::end_div();
 echo html_writer::end_div();
