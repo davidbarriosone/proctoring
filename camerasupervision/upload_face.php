@@ -1,5 +1,4 @@
 <?php
-define('AJAX_SCRIPT', true);
 require_once(__DIR__ . '/../../../../config.php');
 
 require_sesskey();
@@ -19,8 +18,19 @@ $user = $DB->get_record('user', ['id' => $userid], '*', MUST_EXIST);
 // Contar fotos existentes
 $photocount = $DB->count_records('quizaccess_camsup_faces', ['userid' => $userid]);
 if ($photocount >= 3) {
-    echo json_encode(['status' => 'error', 'message' => get_string('maxphotos', 'quizaccess_camerasupervision')]);
-    exit;
+    $error = get_string('maxphotos', 'quizaccess_camerasupervision');
+    
+    // Detectar si es AJAX
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+        strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        echo json_encode(['status' => 'error', 'message' => $error]);
+        exit;
+    } else {
+        redirect(new moodle_url('/mod/quiz/accessrule/camerasupervision/manage_faces.php', ['userid' => $userid]),
+            $error,
+            null,
+            \core\output\notification::NOTIFY_ERROR);
+    }
 }
 
 $photoorder = $photocount + 1;
@@ -35,8 +45,19 @@ if (isset($_FILES['photofile']) && $_FILES['photofile']['error'] === UPLOAD_ERR_
     $finfo = new finfo(FILEINFO_MIME_TYPE);
     $mimetype = $finfo->buffer($data);
     if (!in_array($mimetype, ['image/jpeg', 'image/png', 'image/jpg'])) {
-        echo json_encode(['status' => 'error', 'message' => get_string('invalidimage', 'quizaccess_camerasupervision')]);
-        exit;
+        $error = get_string('invalidimage', 'quizaccess_camerasupervision');
+        
+        // Detectar si es AJAX
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+            echo json_encode(['status' => 'error', 'message' => $error]);
+            exit;
+        } else {
+            redirect(new moodle_url('/mod/quiz/accessrule/camerasupervision/manage_faces.php', ['userid' => $userid]),
+                $error,
+                null,
+                \core\output\notification::NOTIFY_ERROR);
+        }
     }
 }
 // Opción 2: Captura de cámara (base64)
@@ -46,14 +67,34 @@ else if (!empty($image)) {
     }
     $data = base64_decode($image);
     if ($data === false) {
-        echo json_encode(['status' => 'error', 'message' => get_string('invalidimage', 'quizaccess_camerasupervision')]);
-        exit;
+        $error = get_string('invalidimage', 'quizaccess_camerasupervision');
+        
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+            echo json_encode(['status' => 'error', 'message' => $error]);
+            exit;
+        } else {
+            redirect(new moodle_url('/mod/quiz/accessrule/camerasupervision/manage_faces.php', ['userid' => $userid]),
+                $error,
+                null,
+                \core\output\notification::NOTIFY_ERROR);
+        }
     }
     $filename = 'capture_' . time() . '.png';
 }
 else {
-    echo json_encode(['status' => 'error', 'message' => get_string('noimage', 'quizaccess_camerasupervision')]);
-    exit;
+    $error = get_string('noimage', 'quizaccess_camerasupervision');
+    
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+        strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        echo json_encode(['status' => 'error', 'message' => $error]);
+        exit;
+    } else {
+        redirect(new moodle_url('/mod/quiz/accessrule/camerasupervision/manage_faces.php', ['userid' => $userid]),
+            $error,
+            null,
+            \core\output\notification::NOTIFY_ERROR);
+    }
 }
 
 // Guardar registro en BD
@@ -79,17 +120,20 @@ $filerecord = [
 
 $fs->create_file_from_string($filerecord, $data);
 
-// Si es AJAX, responder JSON
-if (defined('AJAX_SCRIPT')) {
+$successmsg = get_string('photouploadsuccess', 'quizaccess_camerasupervision');
+
+// Detectar si es AJAX (captura de cámara)
+if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+    strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
     echo json_encode([
         'status' => 'ok',
-        'message' => get_string('photouploadsuccess', 'quizaccess_camerasupervision'),
+        'message' => $successmsg,
         'faceid' => $faceid
     ]);
 } else {
-    // Si es form normal, redirigir
+    // Si es form normal (subida de archivo), redirigir con mensaje amigable
     redirect(new moodle_url('/mod/quiz/accessrule/camerasupervision/manage_faces.php', ['userid' => $userid]),
-        get_string('photouploadsuccess', 'quizaccess_camerasupervision'),
+        $successmsg . ' (Foto #' . $photoorder . ' de ' . fullname($user) . ')',
         null,
         \core\output\notification::NOTIFY_SUCCESS);
 }
