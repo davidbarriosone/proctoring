@@ -240,14 +240,14 @@ define(['jquery', 'core/log', 'core/notification'], function($, log, notificatio
         var ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        // Mostrar imagen capturada
-        $('#captured-image').attr('src', canvas.toDataURL('image/png')).show();
+        // NO mostrar la imagen capturada - mantenerla oculta
+        // $('#captured-image').attr('src', canvas.toDataURL('image/png')).show();
         
-        // Verificar
+        // Verificar directamente desde el canvas
         await verifyFace(canvas);
         
-        // Detener cámara después de capturar
-        stopVerificationCamera();
+        // NO detener la cámara - mantenerla activa por si necesita reintentar
+        // stopVerificationCamera();
     }
     
     /**
